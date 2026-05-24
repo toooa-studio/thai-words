@@ -15,6 +15,8 @@ import {
 import { generateQuiz, getModeLabel, getQuizSourceLabel } from "@/lib/quiz/quizUtils";
 import type { QuizQuestion, QuizSettings } from "@/lib/types/quiz";
 import { SpeakButton } from "@/app/components/SpeakButton";
+import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
+import { getWordRelations } from "@/lib/data/wordRelations";
 import { saveWrongWordIdsForRetry } from "@/lib/quiz/wrongRetryStorage";
 
 type Props = {
@@ -486,6 +488,8 @@ function AnswerExplanation({
           />
         </div>
 
+        <WordRelationsCallout notes={getWordRelations(word.id)} className="mt-3" />
+
         <div className="mt-3 border-t border-gray-200 pt-3">
           <p className="text-xs uppercase tracking-wider text-gray-400">
             Example
@@ -661,6 +665,10 @@ function QuizResult({
                 <p className="mt-1 text-base text-gray-900 break-words">
                   {q.word.meaning}
                 </p>
+                <WordRelationsCallout
+                  notes={getWordRelations(q.word.id)}
+                  className="mt-3 bg-white"
+                />
                 <p className="mt-2 text-sm text-gray-700 break-words">
                   例文: {q.word.example}
                 </p>

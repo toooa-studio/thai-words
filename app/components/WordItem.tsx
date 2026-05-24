@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Volume2 } from "lucide-react";
 import type { ThaiWord } from "@/lib/types/word";
+import { getWordRelations } from "@/lib/data/wordRelations";
+import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 
 type Props = {
   word: ThaiWord;
@@ -65,6 +67,8 @@ export function WordItem({ word }: Props) {
       <p className="mt-3 sm:mt-4 text-base sm:text-lg text-gray-900 break-words">
         {word.meaning}
       </p>
+
+      <WordRelationsCallout notes={getWordRelations(word.id)} />
 
       <div className="mt-4 sm:mt-5 border-t border-gray-100 pt-3 sm:pt-4">
         <div className="flex items-start justify-between gap-3 sm:gap-4">

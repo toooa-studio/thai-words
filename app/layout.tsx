@@ -7,8 +7,8 @@ import { Footer } from "./components/Footer";
 
 export const metadata: Metadata = {
   title: {
-    default: "OTOのオンラインタイ語講座",
-    template: "%s | OTOのオンラインタイ語講座",
+    default: "TonSonのオンラインタイ語講座",
+    template: "%s | TonSonのオンラインタイ語講座",
   },
   description:
     "日本語話者のためのシンプルなタイ語学習サイト。よく使われる順の基礎単語帳、穴埋め問題、ブログ。",

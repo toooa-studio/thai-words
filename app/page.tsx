@@ -76,7 +76,7 @@ export default function Home() {
             Online Thai Course
           </p>
           <h1 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white leading-tight">
-            OTOのオンライン
+            TonSonのオンライン
             <br className="sm:hidden" />
             タイ語講座
           </h1>

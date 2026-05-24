@@ -28,11 +28,11 @@ export function Footer() {
           <div>
             <Link
               href="/"
-              aria-label="OTOのオンラインタイ語講座 トップページへ"
+              aria-label="TonSonのオンラインタイ語講座 トップページへ"
               className="inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold tracking-wide text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               <span className="inline-flex h-8 w-8 items-center justify-center bg-white text-sm font-bold text-[#1F2937]">
-                OTO
+                TonSon
               </span>
               <span>のオンラインタイ語講座</span>
             </Link>
@@ -78,7 +78,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 border-t border-gray-700 pt-4 text-xs text-gray-400">
-          © {year} OTOのオンラインタイ語講座
+          © {year} TonSonのオンラインタイ語講座
         </div>
       </div>
     </footer>

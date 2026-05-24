@@ -53,11 +53,11 @@ export function Header() {
       <div className="mx-auto flex h-[10vh] min-h-[56px] max-w-screen-lg items-center justify-between gap-3 px-4">
         <Link
           href="/"
-          aria-label="OTOのオンラインタイ語講座 トップページへ"
+          aria-label="TonSonのオンラインタイ語講座 トップページへ"
           className="inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold tracking-wide text-gray-900 sm:text-lg"
         >
           <span className="inline-flex h-8 w-8 items-center justify-center bg-gray-900 text-sm font-bold text-white">
-            OTO
+            TonSon
           </span>
           <span className="hidden sm:inline">のオンラインタイ語講座</span>
           <span className="sm:hidden">タイ語講座</span>

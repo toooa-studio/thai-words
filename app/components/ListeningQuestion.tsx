@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import type { ListeningQuestion as ListeningQuestionType } from "@/lib/data/listeningQuestions";
 import type { DialogueLine } from "@/lib/data/listeningDialogues";
+import { getRelationsFromJapaneseGlosses } from "@/lib/data/wordRelations";
+import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 
 type Props = {
   question: ListeningQuestionType;
@@ -194,6 +196,12 @@ export function ListeningQuestion({ question }: Props) {
               <p className="mt-1 text-base text-gray-900 break-words">
                 {correctOption.meaning}
               </p>
+              <WordRelationsCallout
+                notes={getRelationsFromJapaneseGlosses(
+                  correctOption.meaning
+                )}
+                className="mt-3"
+              />
 
               <div className="mt-4 border-t border-gray-200 pt-3">
                 <p className="text-xs uppercase tracking-wider text-gray-500">
@@ -208,6 +216,10 @@ export function ListeningQuestion({ question }: Props) {
                 <p className="mt-1 text-sm text-gray-700 break-words">
                   {prompt.meaning}
                 </p>
+                <WordRelationsCallout
+                  notes={getRelationsFromJapaneseGlosses(prompt.meaning)}
+                  className="mt-3"
+                />
               </div>
 
               <div className="mt-4 border-t border-gray-200 pt-3">

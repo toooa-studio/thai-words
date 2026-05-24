@@ -1,5 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { FillQuestion as FillQuestionType } from "@/lib/data/fillQuestions";
+import { getWordRelations } from "@/lib/data/wordRelations";
+import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 import { SpeakButton } from "./SpeakButton";
 
 type Props = {
@@ -69,6 +71,10 @@ export function FillQuestion({ question }: Props) {
                   <p className="mt-1 text-base text-gray-900 break-words">
                     {correctOption.meaning}
                   </p>
+                  <WordRelationsCallout
+                    notes={getWordRelations(word.id)}
+                    className="mt-3"
+                  />
                 </div>
                 <SpeakButton
                   text={word.thai}

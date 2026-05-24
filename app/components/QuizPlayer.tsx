@@ -72,7 +72,45 @@ export function QuizPlayer({ settings }: Props) {
   }, []);
 
   useEffect(() => {
+    const digitToIndex = (key: string): number | undefined => {
+      const map: Record<string, number> = {
+        "1": 0,
+        "2": 1,
+        "3": 2,
+        "4": 3,
+        Numpad1: 0,
+        Numpad2: 1,
+        Numpad3: 2,
+        Numpad4: 3,
+      };
+      return map[key];
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
+      const choiceIndex = digitToIndex(e.key);
+      if (choiceIndex !== undefined) {
+        if (e.repeat) return;
+        if (loadStateRef.current !== "ready" || resultShownRef.current) return;
+        if (selectedIndexRef.current !== null) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        const target = e.target;
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement
+        ) {
+          return;
+        }
+
+        const q = questionsRef.current[currentIndexRef.current];
+        if (!q || choiceIndex >= q.options.length) return;
+
+        e.preventDefault();
+        setSelectedIndex(choiceIndex);
+        return;
+      }
+
       if (e.key !== "Enter" || e.repeat) return;
       if (loadStateRef.current !== "ready" || resultShownRef.current) return;
       if (selectedIndexRef.current === null) return;
@@ -179,7 +217,16 @@ export function QuizPlayer({ settings }: Props) {
         <div className="p-4 sm:p-6">
           <QuestionPrompt question={current} />
 
-          <ul className="mt-5 sm:mt-6 grid gap-2 sm:gap-3">
+          <p className="mt-4 text-xs text-gray-500">
+            キーボードの <span className="font-mono">1</span>〜
+            <span className="font-mono">4</span>（テンキー可）で選択。解答後は{" "}
+            <span className="font-mono">Enter</span> で次へ進みます。
+          </p>
+
+          <ul
+            className="mt-3 sm:mt-4 grid gap-2 sm:gap-3"
+            aria-label="選択肢（キー1〜4で回答）"
+          >
             {current.options.map((option, idx) => {
               const isSelected = selectedIndex === idx;
               const isCorrect = idx === current.correctIndex;
@@ -215,10 +262,16 @@ export function QuizPlayer({ settings }: Props) {
                     onClick={() => handleSelect(idx)}
                     disabled={isAnswered}
                     aria-pressed={isSelected}
-                    className={`flex min-w-0 flex-1 items-center justify-between gap-3 border min-h-[56px] px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 ${stateClass} ${
+                    className={`flex min-w-0 flex-1 items-center justify-between gap-3 border min-h-[56px] px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 ${stateClass} ${
                       isAnswered ? "cursor-default" : "cursor-pointer"
                     }`}
                   >
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-800"
+                      aria-hidden
+                    >
+                      {idx + 1}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-medium break-words">
                         {option.text}
@@ -273,27 +326,57 @@ export function QuizPlayer({ settings }: Props) {
 
 function QuestionPrompt({ question }: { question: QuizQuestion }) {
   useEffect(() => {
-    if (
-      question.mode !== "audio" ||
-      !question.prompt.speakText ||
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window)
-    ) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
-    const text = question.prompt.speakText as string;
-    const t = setTimeout(() => {
+
+    type AutoSpec = { text: string; lang: string; rate: number };
+    let spec: AutoSpec | null = null;
+
+    switch (question.mode) {
+      case "audio": {
+        const t = question.prompt.speakText;
+        if (t) spec = { text: t, lang: "th-TH", rate: 0.85 };
+        break;
+      }
+      case "meaning":
+        spec = { text: question.word.thai, lang: "th-TH", rate: 0.85 };
+        break;
+      case "fill":
+        spec = { text: question.word.example, lang: "th-TH", rate: 0.85 };
+        break;
+      case "thai":
+        spec = { text: question.prompt.text, lang: "ja-JP", rate: 0.95 };
+        break;
+      default:
+        break;
+    }
+
+    if (!spec || !spec.text.trim()) return;
+
+    const { text, lang, rate } = spec;
+
+    const timer = window.setTimeout(() => {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = "th-TH";
-      utter.rate = 0.85;
+      utter.lang = lang;
+      utter.rate = rate;
+      utter.onerror = () => {};
       window.speechSynthesis.speak(utter);
-    }, 200);
+    }, 0);
+
     return () => {
-      clearTimeout(t);
+      window.clearTimeout(timer);
       window.speechSynthesis.cancel();
     };
-  }, [question.id, question.mode, question.prompt.speakText]);
+  }, [
+    question.id,
+    question.mode,
+    question.prompt.speakText,
+    question.prompt.text,
+    question.word.thai,
+    question.word.example,
+  ]);
 
   return (
     <div>
@@ -318,7 +401,7 @@ function QuestionPrompt({ question }: { question: QuizQuestion }) {
             </span>
           </div>
           <p className="text-sm text-gray-600">
-            タップで音声をもう一度再生できます
+            表示と同時にタイ語を読み上げます。聞き取りにくい場合はボタンでもう一度再生できます。
           </p>
         </div>
       ) : (
@@ -404,15 +487,26 @@ function AnswerExplanation({
           <p className="text-xs uppercase tracking-wider text-gray-400">
             Example
           </p>
-          <p className="mt-1 text-base text-gray-900 break-words">
-            {word.example}
-          </p>
-          <p className="mt-0.5 text-sm text-gray-500 font-mono break-words">
-            {word.exampleRomanization}
-          </p>
-          <p className="mt-1 text-sm text-gray-700 break-words">
-            {word.exampleMeaning}
-          </p>
+          <div className="mt-1 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-base text-gray-900 break-words">
+                {word.example}
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500 font-mono break-words">
+                {word.exampleRomanization}
+              </p>
+              <p className="mt-1 text-sm text-gray-700 break-words">
+                {word.exampleMeaning}
+              </p>
+            </div>
+            <SpeakButton
+              text={word.example}
+              size="sm"
+              markEnterSecondary
+              ariaLabel={`例文「${word.example}」を再生`}
+              className="self-start"
+            />
+          </div>
         </div>
       </div>
     </div>

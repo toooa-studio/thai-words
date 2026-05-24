@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { ListeningQuestion as ListeningQuestionType } from "@/lib/data/listeningQuestions";
 import type { DialogueLine } from "@/lib/data/listeningDialogues";
-import { getRelationsFromJapaneseGlosses } from "@/lib/data/wordRelations";
+import { getRelationsFromJapaneseGlosses } from "@/lib/data/manualWordRelations";
 import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 
 type Props = {

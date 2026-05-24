@@ -475,31 +475,55 @@ const RELATIONS: Partial<Record<number, WordRelationNotes>> = {
   },
 };
 
-function deriveBreakdownFromMeaning(meaning: string): string | undefined {
-  const normalized = meaning.replace(/\s+/g, " ").trim();
-  if (!normalized) return undefined;
-  const segments = normalized
-    .split(/\s*[/／・、,，]\s*/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  if (segments.length <= 1) return undefined;
-  const body = segments.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  return `日本語訳が複数並んでいるときの整理:\n${body}`;
+function cleanMeaningText(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/[（(][^()（）]*[）)]/g, "")
+    .trim();
 }
 
 function extractMeaningSegments(meaning: string): string[] {
-  return meaning
-    .replace(/\s+/g, " ")
+  return cleanMeaningText(meaning)
     .split(/\s*[/／・、,，]\s*/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
 
-const JAPANESE_ANTONYM_HINTS: Array<[string, string]> = [
+function extractMeaningKeywords(meaning: string): string[] {
+  const raw = extractMeaningSegments(meaning)
+    .flatMap((s) => s.split(/\s+/))
+    .map((s) => s.replace(/[「」『』【】\[\]（）()]/g, "").trim())
+    .filter((s) => s.length > 0);
+  return Array.from(new Set(raw));
+}
+
+function deriveBreakdownFromMeaning(meaning: string): string | undefined {
+  const segments = extractMeaningSegments(meaning);
+  if (segments.length <= 1) return undefined;
+  const body = segments.map((s, i) => `${i + 1}. ${s}`).join("\n");
+  return `日本語訳が複数並ぶ語の整理:\n${body}`;
+}
+
+const WORD_BY_ID = new Map(thaiWords.map((w) => [w.id, w]));
+const WORD_BY_THAI = new Map<string, typeof thaiWords>();
+for (const word of thaiWords) {
+  const current = WORD_BY_THAI.get(word.thai) ?? [];
+  current.push(word);
+  WORD_BY_THAI.set(word.thai, current);
+}
+
+const INDEXED = thaiWords.map((w) => ({
+  ...w,
+  meaningSegments: extractMeaningSegments(w.meaning),
+  meaningKeywords: extractMeaningKeywords(w.meaning),
+}));
+
+const OPPOSITE_PAIRS: Array<[string, string]> = [
   ["大きい", "小さい"],
   ["高い", "低い"],
   ["暑い", "寒い"],
   ["熱い", "冷たい"],
+  ["温かい", "冷たい"],
   ["重い", "軽い"],
   ["速い", "遅い"],
   ["早い", "遅い"],
@@ -514,50 +538,142 @@ const JAPANESE_ANTONYM_HINTS: Array<[string, string]> = [
   ["左", "右"],
   ["男", "女"],
   ["男性", "女性"],
+  ["父", "母"],
+  ["夫", "妻"],
   ["買う", "売る"],
   ["行く", "来る"],
   ["入る", "出る"],
   ["開く", "閉じる"],
+  ["始める", "終わる"],
+  ["好き", "嫌い"],
 ];
 
-function deriveAntonymsFromMeaning(meaning: string): string | undefined {
-  const segments = extractMeaningSegments(meaning);
-  const collected = new Set<string>();
+const OPPOSITE_MAP = new Map<string, string[]>();
+for (const [a, b] of OPPOSITE_PAIRS) {
+  OPPOSITE_MAP.set(a, [...(OPPOSITE_MAP.get(a) ?? []), b]);
+  OPPOSITE_MAP.set(b, [...(OPPOSITE_MAP.get(b) ?? []), a]);
+}
 
-  for (const segment of segments) {
-    for (const [left, right] of JAPANESE_ANTONYM_HINTS) {
-      if (segment.includes(left)) collected.add(right);
-      if (segment.includes(right)) collected.add(left);
+function buildSynonyms(wordId: number): string {
+  const current = INDEXED.find((w) => w.id === wordId);
+  if (!current) return "近い意味の表現（語彙データ外）";
+
+  const scored = INDEXED.filter((w) => w.id !== wordId)
+    .map((candidate) => {
+      const sharedKeywords = candidate.meaningKeywords.filter((k) =>
+        current.meaningKeywords.includes(k)
+      ).length;
+      const sharedSegments = candidate.meaningSegments.filter((seg) =>
+        current.meaningSegments.includes(seg)
+      ).length;
+      const meaningContains =
+        current.meaning.includes(candidate.meaning) ||
+        candidate.meaning.includes(current.meaning)
+          ? 1
+          : 0;
+      const score = sharedKeywords * 3 + sharedSegments * 4 + meaningContains * 2;
+      return { candidate, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.candidate.id - b.candidate.id)
+    .slice(0, 3)
+    .map((x) => `${x.candidate.thai}（${x.candidate.meaning}）`);
+
+  if (scored.length === 0) {
+    const first = current.meaningSegments[0] ?? current.meaning;
+    return `近い意味: ${first}`;
+  }
+  return `近い語: ${scored.join("／")}`;
+}
+
+function buildAntonyms(wordId: number): string {
+  const current = INDEXED.find((w) => w.id === wordId);
+  if (!current) return "（対義語候補は語彙データ外）";
+
+  const oppositeHints = new Set<string>();
+  for (const keyword of current.meaningKeywords) {
+    for (const [key, values] of OPPOSITE_MAP.entries()) {
+      if (keyword.includes(key)) {
+        for (const value of values) oppositeHints.add(value);
+      }
     }
   }
 
-  if (collected.size === 0) return undefined;
-  return `対概念の例: ${Array.from(collected).join("／")}`;
+  if (oppositeHints.size === 0) return "（明確な対義語は文脈依存）";
+
+  const candidates = INDEXED.filter((w) => w.id !== wordId)
+    .map((candidate) => {
+      let score = 0;
+      for (const hint of oppositeHints) {
+        if (candidate.meaning.includes(hint)) score += 3;
+        if (candidate.meaningKeywords.includes(hint)) score += 2;
+      }
+      return { candidate, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.candidate.id - b.candidate.id)
+    .slice(0, 3)
+    .map((x) => `${x.candidate.thai}（${x.candidate.meaning}）`);
+
+  if (candidates.length === 0) {
+    return `反対概念のヒント: ${Array.from(oppositeHints).join("／")}`;
+  }
+  return `反対側の語: ${candidates.join("／")}`;
 }
 
-function deriveSynonymsFromMeaning(meaning: string): string {
-  const segments = extractMeaningSegments(meaning);
-  if (segments.length === 0) return "近い意味の表現（文脈依存）";
-  if (segments.length === 1) return `近い意味: ${segments[0]}`;
-  return `近い意味のまとまり: ${segments.join("／")}`;
-}
-
-function deriveBreakdownFromWord(wordThai: string, meaning: string): string {
-  const byMeaning = deriveBreakdownFromMeaning(meaning);
-  if (byMeaning) return byMeaning;
-
-  const thaiSegments = wordThai
+function splitThaiCompound(thai: string): string[] | undefined {
+  const direct = thai
     .split(/[-\s]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+  if (direct.length >= 2) return direct;
 
-  if (thaiSegments.length > 1) {
-    const body = thaiSegments.map((s, i) => `${i + 1}. ${s}`).join("\n");
-    return `連語・複合語のまとまり:\n${body}`;
+  const terms = Array.from(WORD_BY_THAI.keys())
+    .filter((t) => t !== thai && t.length >= 2)
+    .sort((a, b) => b.length - a.length);
+
+  const n = thai.length;
+  const dp: Array<string[] | null> = Array(n + 1).fill(null);
+  dp[0] = [];
+
+  for (let i = 0; i < n; i += 1) {
+    if (!dp[i]) continue;
+    for (const term of terms) {
+      if (!thai.startsWith(term, i)) continue;
+      const nextIndex = i + term.length;
+      const next = [...(dp[i] ?? []), term];
+      if (next.length > 3) continue;
+      const prev = dp[nextIndex];
+      if (!prev || next.length < prev.length) {
+        dp[nextIndex] = next;
+      }
+    }
   }
 
-  const primaryMeaning = extractMeaningSegments(meaning)[0] ?? meaning;
-  return `一語として使う語。\n主な意味: ${primaryMeaning}`;
+  const result = dp[n];
+  if (!result || result.length < 2) return undefined;
+  return result;
+}
+
+function buildBreakdown(wordId: number): string {
+  const word = WORD_BY_ID.get(wordId);
+  if (!word) return "語彙データ外のため、分解情報を取得できません。";
+
+  const byMeaning = deriveBreakdownFromMeaning(word.meaning);
+  if (byMeaning) return byMeaning;
+
+  const compounds = splitThaiCompound(word.thai);
+  if (compounds && compounds.length >= 2) {
+    const parts = compounds.map((part) => {
+      const info = WORD_BY_THAI.get(part)?.[0];
+      const gloss = info?.meaning ?? "（意味未登録）";
+      return `${part}＝${gloss}`;
+    });
+    return `語の構成要素:\n${parts.join("\n")}\n→ 全体として「${word.meaning}」。`;
+  }
+
+  const primary = extractMeaningSegments(word.meaning)[0] ?? word.meaning;
+  return `一語として学ぶ語。\n主な意味: ${primary}`;
 }
 
 /** 語IDがないとき（リスニングの選択肢など）に、日本語訳テキストだけから整理を作る */
@@ -565,33 +681,18 @@ export function getRelationsFromJapaneseGlosses(
   meaning: string
 ): WordRelationNotes {
   const breakdown = deriveBreakdownFromMeaning(meaning);
-  return breakdown ? { breakdown } : {};
+  if (!breakdown) return {};
+  return { breakdown };
 }
 
 export function getWordRelations(wordId: number): WordRelationNotes {
   const manual = RELATIONS[wordId];
-  const word = thaiWords.find((w) => w.id === wordId);
+  const word = WORD_BY_ID.get(wordId);
   if (!word && !manual) return {};
 
-  const fallbackMeaning = word?.meaning ?? "";
-  const fallbackThai = word?.thai ?? "";
-  const autoBreakdown =
-    manual?.breakdown ?? deriveBreakdownFromWord(fallbackThai, fallbackMeaning);
-  const autoSynonyms =
-    manual?.synonyms ?? deriveSynonymsFromMeaning(fallbackMeaning);
-  const autoAntonyms =
-    manual?.antonyms ??
-    deriveAntonymsFromMeaning(fallbackMeaning) ??
-    "（明確な対義語は文脈依存）";
-
-  const merged: WordRelationNotes = {
-    breakdown: autoBreakdown,
-    synonyms: autoSynonyms,
-    antonyms: autoAntonyms,
+  return {
+    breakdown: manual?.breakdown ?? buildBreakdown(wordId),
+    synonyms: manual?.synonyms ?? buildSynonyms(wordId),
+    antonyms: manual?.antonyms ?? buildAntonyms(wordId),
   };
-
-  if (!merged.breakdown && !merged.synonyms && !merged.antonyms) {
-    return {};
-  }
-  return merged;
 }

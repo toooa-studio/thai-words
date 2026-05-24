@@ -31,7 +31,7 @@ export function Footer() {
               aria-label="TonSonのオンラインタイ語講座 トップページへ"
               className="inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold tracking-wide text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
-              <span className="inline-flex h-8 w-8 items-center justify-center bg-white text-sm font-bold text-[#1F2937]">
+              <span className="inline-flex h-8 min-w-[56px] items-center justify-center bg-white px-2 text-[11px] font-bold leading-none text-[#1F2937] sm:text-xs">
                 TonSon
               </span>
               <span>のオンラインタイ語講座</span>

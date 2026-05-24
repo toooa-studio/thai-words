@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Volume2 } from "lucide-react";
 import type { ThaiWord } from "@/lib/types/word";
-import { getWordRelations } from "@/lib/data/wordRelations";
+import { getWordRelations } from "@/lib/data/manualWordRelations";
 import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 
 type Props = {

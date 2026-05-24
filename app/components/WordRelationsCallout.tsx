@@ -1,4 +1,4 @@
-import type { WordRelationNotes } from "@/lib/data/wordRelations";
+import type { WordRelationNotes } from "@/lib/data/manualWordRelations";
 
 type Props = {
   notes: WordRelationNotes;

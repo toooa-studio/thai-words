@@ -16,7 +16,7 @@ import { generateQuiz, getModeLabel, getQuizSourceLabel } from "@/lib/quiz/quizU
 import type { QuizQuestion, QuizSettings } from "@/lib/types/quiz";
 import { SpeakButton } from "@/app/components/SpeakButton";
 import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
-import { getWordRelations } from "@/lib/data/wordRelations";
+import { getWordRelations } from "@/lib/data/manualWordRelations";
 import { saveWrongWordIdsForRetry } from "@/lib/quiz/wrongRetryStorage";
 
 type Props = {

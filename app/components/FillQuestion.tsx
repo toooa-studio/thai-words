@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import type { FillQuestion as FillQuestionType } from "@/lib/data/fillQuestions";
-import { getWordRelations } from "@/lib/data/wordRelations";
+import { getWordRelations } from "@/lib/data/manualWordRelations";
 import { WordRelationsCallout } from "@/app/components/WordRelationsCallout";
 import { SpeakButton } from "./SpeakButton";
 

@@ -56,7 +56,7 @@ export function Header() {
           aria-label="TonSonのオンラインタイ語講座 トップページへ"
           className="inline-flex items-center gap-2 whitespace-nowrap text-base font-semibold tracking-wide text-gray-900 sm:text-lg"
         >
-          <span className="inline-flex h-8 w-8 items-center justify-center bg-gray-900 text-sm font-bold text-white">
+          <span className="inline-flex h-8 min-w-[56px] items-center justify-center bg-gray-900 px-2 text-[11px] font-bold leading-none text-white sm:text-xs">
             TonSon
           </span>
           <span className="hidden sm:inline">のオンラインタイ語講座</span>

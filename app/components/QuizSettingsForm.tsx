@@ -51,7 +51,7 @@ const MODE_OPTIONS: ModeOption[] = [
   },
 ];
 
-const COUNT_OPTIONS: QuizCount[] = [10, 20, 50];
+const COUNT_OPTIONS: QuizCount[] = [10, 20, 50, 100];
 
 export function QuizSettingsForm() {
   const router = useRouter();
@@ -173,7 +173,7 @@ export function QuizSettingsForm() {
         <div
           role="radiogroup"
           aria-label="問題数"
-          className="mt-3 grid grid-cols-3 gap-2 sm:gap-3"
+          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3"
         >
           {COUNT_OPTIONS.map((c) => {
             const isSelected = count === c;

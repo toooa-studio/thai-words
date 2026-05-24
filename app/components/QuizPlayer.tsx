@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Check,
   X,
@@ -9,10 +10,12 @@ import {
   RotateCcw,
   Settings,
   Trophy,
+  Target,
 } from "lucide-react";
-import { generateQuiz, getModeLabel, getRangeLabel } from "@/lib/quiz/quizUtils";
+import { generateQuiz, getModeLabel, getQuizSourceLabel } from "@/lib/quiz/quizUtils";
 import type { QuizQuestion, QuizSettings } from "@/lib/types/quiz";
 import { SpeakButton } from "@/app/components/SpeakButton";
+import { saveWrongWordIdsForRetry } from "@/lib/quiz/wrongRetryStorage";
 
 type Props = {
   settings: QuizSettings;
@@ -41,7 +44,7 @@ export function QuizPlayer({ settings }: Props) {
   useEffect(() => {
     startNewQuiz();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.mode, settings.range, settings.count]);
+  }, [settings.mode, settings.range, settings.count, settings.restrictWordIds?.join(",") ?? ""]);
 
   const loadStateRef = useRef(loadState);
   const resultShownRef = useRef(resultShown);
@@ -194,7 +197,7 @@ export function QuizPlayer({ settings }: Props) {
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wider text-gray-500">
-              {getModeLabel(settings.mode)} / {getRangeLabel(settings.range)}
+              {getModeLabel(settings.mode)} / {getQuizSourceLabel(settings)}
             </p>
             <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
               {currentIndex + 1} / {total}
@@ -524,6 +527,7 @@ function QuizResult({
   settings: QuizSettings;
   onRetry: () => void;
 }) {
+  const router = useRouter();
   const total = questions.length;
   const correct = questions.reduce((acc, q, i) => {
     return answers[i] === q.correctIndex ? acc + 1 : acc;
@@ -550,7 +554,7 @@ function QuizResult({
           結果
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          {getModeLabel(settings.mode)} / {getRangeLabel(settings.range)}
+          {getModeLabel(settings.mode)} / {getQuizSourceLabel(settings)}
         </p>
 
         <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-4 border-t border-gray-200 pt-6">
@@ -582,22 +586,47 @@ function QuizResult({
 
         <p className="mt-5 text-base text-gray-700">{comment}</p>
 
-        <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 bg-gray-900 text-white text-base font-medium whitespace-nowrap hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
-          >
-            <RotateCcw className="h-5 w-5" aria-hidden="true" />
-            <span>もう一度挑戦</span>
-          </button>
-          <Link
-            href="/quiz"
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 bg-white text-gray-900 border border-gray-300 text-base font-medium whitespace-nowrap hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
-          >
-            <Settings className="h-5 w-5" aria-hidden="true" />
-            <span>設定を変える</span>
-          </Link>
+        <div className="mt-6 flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 bg-gray-900 text-white text-base font-medium whitespace-nowrap hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
+            >
+              <RotateCcw className="h-5 w-5" aria-hidden="true" />
+              <span>もう一度挑戦</span>
+            </button>
+            <Link
+              href="/quiz"
+              className="inline-flex items-center justify-center gap-2 min-h-[48px] px-5 bg-white text-gray-900 border border-gray-300 text-base font-medium whitespace-nowrap hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
+            >
+              <Settings className="h-5 w-5" aria-hidden="true" />
+              <span>設定を変える</span>
+            </Link>
+          </div>
+          {wrongs.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                const ids = [...new Set(wrongs.map(({ q }) => q.word.id))];
+                saveWrongWordIdsForRetry(ids);
+                const params = new URLSearchParams({
+                  mode: settings.mode,
+                  range: settings.range,
+                  count: String(settings.count),
+                  wrongOnly: "1",
+                  _r: String(Date.now()),
+                });
+                router.push(`/quiz/play?${params.toString()}`);
+              }}
+              className="inline-flex w-full items-center justify-center gap-2 min-h-[48px] px-5 bg-white text-gray-900 border border-gray-900 text-base font-medium whitespace-nowrap hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors sm:mx-auto sm:w-auto"
+            >
+              <Target className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span>
+                間違えた語だけでもう一度（{wrongs.length}語）
+              </span>
+            </button>
+          ) : null}
         </div>
       </section>
 

@@ -2,7 +2,7 @@ import type { QuizCount, QuizMode, QuizRange, QuizSettings } from "@/lib/types/q
 import { getTotalPages } from "@/lib/data/thaiWords";
 
 const VALID_MODES: QuizMode[] = ["meaning", "thai", "fill", "audio"];
-const VALID_COUNTS: QuizCount[] = [10, 20, 50];
+const VALID_COUNTS: QuizCount[] = [10, 20, 50, 100];
 
 export function parseQuizPlaySearchParams(params: {
   mode?: string;

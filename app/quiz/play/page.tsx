@@ -1,34 +1,67 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { QuizPlayer } from "@/app/components/QuizPlayer";
-import { getModeLabel, getRangeLabel } from "@/lib/quiz/quizUtils";
+import { getModeLabel, getQuizSourceLabel } from "@/lib/quiz/quizUtils";
 import { parseQuizPlaySearchParams } from "@/lib/quiz/parseQuizPlayParams";
+import { loadWrongWordIdsForRetry } from "@/lib/quiz/wrongRetryStorage";
+import type { QuizSettings } from "@/lib/types/quiz";
 
 function QuizPlayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryKey = searchParams.toString();
+  const wrongOnly = searchParams.get("wrongOnly") === "1";
 
-  const raw = {
-    mode: searchParams.get("mode") ?? undefined,
-    range: searchParams.get("range") ?? undefined,
-    count: searchParams.get("count") ?? undefined,
-  };
-  const settings = parseQuizPlaySearchParams(raw);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const baseSettings = useMemo(() => {
+    return parseQuizPlaySearchParams({
+      mode: searchParams.get("mode") ?? undefined,
+      range: searchParams.get("range") ?? undefined,
+      count: searchParams.get("count") ?? undefined,
+    });
+  }, [queryKey, searchParams]);
+
+  const settings: QuizSettings | null = useMemo(() => {
+    if (!baseSettings) return null;
+    if (!wrongOnly) return baseSettings;
+    if (!mounted) return null;
+    const ids = loadWrongWordIdsForRetry();
+    if (!ids?.length) return null;
+    return { ...baseSettings, restrictWordIds: ids };
+  }, [baseSettings, wrongOnly, queryKey, mounted]);
 
   useEffect(() => {
-    if (!settings) {
+    if (!baseSettings) {
+      router.replace("/quiz");
+      return;
+    }
+    if (!wrongOnly || !mounted) return;
+    const ids = loadWrongWordIdsForRetry();
+    if (!ids?.length) {
       router.replace("/quiz");
     }
-  }, [settings, router]);
+  }, [baseSettings, wrongOnly, queryKey, router, mounted]);
+
+  if (!baseSettings) {
+    return (
+      <div className="mx-auto max-w-screen-md px-4 py-10 text-center text-sm text-gray-600">
+        設定へ戻ります…
+      </div>
+    );
+  }
 
   if (!settings) {
     return (
       <div className="mx-auto max-w-screen-md px-4 py-10 text-center text-sm text-gray-600">
-        設定へ戻ります…
+        読み込み中…
       </div>
     );
   }
@@ -47,7 +80,7 @@ function QuizPlayContent() {
           <p className="text-xs sm:text-sm text-gray-600 text-right break-words">
             {getModeLabel(settings.mode)}
             <span className="mx-1 text-gray-300">/</span>
-            {getRangeLabel(settings.range)}
+            {getQuizSourceLabel(settings)}
             <span className="mx-1 text-gray-300">/</span>
             {settings.count} 問
           </p>

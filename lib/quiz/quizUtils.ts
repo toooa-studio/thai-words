@@ -57,6 +57,13 @@ export function getRangeLabel(range: QuizRange): string {
   return "全範囲";
 }
 
+export function getQuizSourceLabel(settings: QuizSettings): string {
+  if (settings.restrictWordIds?.length) {
+    return `間違い復習（${settings.restrictWordIds.length} 語）`;
+  }
+  return getRangeLabel(settings.range);
+}
+
 export function getModeLabel(mode: QuizMode): string {
   switch (mode) {
     case "meaning":
@@ -164,8 +171,15 @@ function buildQuestion(
 }
 
 export function generateQuiz(settings: QuizSettings): QuizQuestion[] {
-  const { mode, range, count } = settings;
-  let pool = getWordsInRange(range);
+  const { mode, range, count, restrictWordIds } = settings;
+  let pool: ThaiWord[];
+
+  if (restrictWordIds?.length) {
+    const idSet = new Set(restrictWordIds);
+    pool = thaiWords.filter((w) => idSet.has(w.id));
+  } else {
+    pool = getWordsInRange(range);
+  }
 
   if (mode === "fill") {
     pool = pool.filter((w) => w.example.includes(w.thai));

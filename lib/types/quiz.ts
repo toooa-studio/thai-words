@@ -15,7 +15,7 @@ export type QuizRange =
   | "p9"
   | "p10";
 
-export type QuizCount = 10 | 20 | 50;
+export type QuizCount = 10 | 20 | 50 | 100;
 
 export type QuizOption = {
   text: string;
@@ -41,4 +41,6 @@ export type QuizSettings = {
   mode: QuizMode;
   range: QuizRange;
   count: QuizCount;
+  /** 指定時はこの語IDのみから出題する（ミス復習など） */
+  restrictWordIds?: number[];
 };

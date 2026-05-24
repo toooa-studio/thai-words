@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
-  Volume2,
   Check,
   X,
   ArrowRight,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { generateQuiz, getModeLabel, getRangeLabel } from "@/lib/quiz/quizUtils";
 import type { QuizQuestion, QuizSettings } from "@/lib/types/quiz";
+import { SpeakButton } from "@/app/components/SpeakButton";
 
 type Props = {
   settings: QuizSettings;
@@ -42,6 +42,61 @@ export function QuizPlayer({ settings }: Props) {
     startNewQuiz();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.mode, settings.range, settings.count]);
+
+  const loadStateRef = useRef(loadState);
+  const resultShownRef = useRef(resultShown);
+  const selectedIndexRef = useRef(selectedIndex);
+  const currentIndexRef = useRef(currentIndex);
+  const questionsRef = useRef(questions);
+
+  loadStateRef.current = loadState;
+  resultShownRef.current = resultShown;
+  selectedIndexRef.current = selectedIndex;
+  currentIndexRef.current = currentIndex;
+  questionsRef.current = questions;
+
+  const handleNext = useCallback(() => {
+    if (loadStateRef.current !== "ready" || resultShownRef.current) return;
+    const sel = selectedIndexRef.current;
+    if (sel === null) return;
+    const ci = currentIndexRef.current;
+    const qs = questionsRef.current;
+    const total = qs.length;
+    setAnswers((prev) => [...prev, sel]);
+    if (ci + 1 >= total) {
+      setResultShown(true);
+    } else {
+      setCurrentIndex(ci + 1);
+      setSelectedIndex(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.repeat) return;
+      if (loadStateRef.current !== "ready" || resultShownRef.current) return;
+      if (selectedIndexRef.current === null) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+      if (target instanceof Element && target.closest("[data-quiz-enter-secondary]")) {
+        return;
+      }
+
+      e.preventDefault();
+      handleNext();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [handleNext]);
 
   if (loadState === "loading") {
     return (
@@ -93,20 +148,6 @@ export function QuizPlayer({ settings }: Props) {
   const handleSelect = (idx: number) => {
     if (isAnswered) return;
     setSelectedIndex(idx);
-  };
-
-  const handleNext = () => {
-    if (selectedIndex === null) return;
-    const nextAnswers = [...answers, selectedIndex];
-    setAnswers(nextAnswers);
-
-    if (currentIndex + 1 >= total) {
-      setResultShown(true);
-      return;
-    }
-
-    setCurrentIndex(currentIndex + 1);
-    setSelectedIndex(null);
   };
 
   return (
@@ -168,13 +209,13 @@ export function QuizPlayer({ settings }: Props) {
               }
 
               return (
-                <li key={idx}>
+                <li key={idx} className="flex gap-2 items-stretch">
                   <button
                     type="button"
                     onClick={() => handleSelect(idx)}
                     disabled={isAnswered}
                     aria-pressed={isSelected}
-                    className={`flex w-full items-center justify-between gap-3 border min-h-[56px] px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 ${stateClass} ${
+                    className={`flex min-w-0 flex-1 items-center justify-between gap-3 border min-h-[56px] px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 ${stateClass} ${
                       isAnswered ? "cursor-default" : "cursor-pointer"
                     }`}
                   >
@@ -190,6 +231,15 @@ export function QuizPlayer({ settings }: Props) {
                     </div>
                     {icon ? <span className="shrink-0">{icon}</span> : null}
                   </button>
+                  {current.mode === "thai" || current.mode === "fill" ? (
+                    <SpeakButton
+                      text={option.text}
+                      size="sm"
+                      markEnterSecondary
+                      ariaLabel={`「${option.text}」を再生`}
+                      className="self-center"
+                    />
+                  ) : null}
                 </li>
               );
             })}
@@ -222,38 +272,28 @@ export function QuizPlayer({ settings }: Props) {
 }
 
 function QuestionPrompt({ question }: { question: QuizQuestion }) {
-  const [supported, setSupported] = useState(true);
-  const [speaking, setSpeaking] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setSupported(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (
-      question.mode === "audio" &&
-      question.prompt.speakText &&
-      typeof window !== "undefined" &&
-      "speechSynthesis" in window
+      question.mode !== "audio" ||
+      !question.prompt.speakText ||
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window)
     ) {
-      const t = setTimeout(() => speak(question.prompt.speakText as string), 200);
-      return () => clearTimeout(t);
+      return;
     }
+    const text = question.prompt.speakText as string;
+    const t = setTimeout(() => {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "th-TH";
+      utter.rate = 0.85;
+      window.speechSynthesis.speak(utter);
+    }, 200);
+    return () => {
+      clearTimeout(t);
+      window.speechSynthesis.cancel();
+    };
   }, [question.id, question.mode, question.prompt.speakText]);
-
-  const speak = (text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "th-TH";
-    utter.rate = 0.85;
-    utter.onend = () => setSpeaking(false);
-    utter.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    window.speechSynthesis.speak(utter);
-  };
 
   return (
     <div>
@@ -265,32 +305,49 @@ function QuestionPrompt({ question }: { question: QuizQuestion }) {
 
       {question.mode === "audio" ? (
         <div className="mt-3 flex flex-col items-center gap-3 border border-gray-200 bg-gray-50 p-5 text-center">
-          <button
-            type="button"
-            onClick={() => speak(question.prompt.speakText as string)}
-            disabled={!supported}
-            aria-label="音声を再生"
-            className="inline-flex items-center justify-center min-w-[64px] min-h-[64px] bg-gray-900 text-white border border-gray-900 hover:bg-gray-700 disabled:bg-gray-300 disabled:border-gray-300 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
-          >
-            <Volume2
-              className={`h-7 w-7 ${speaking ? "animate-pulse" : ""}`}
-              aria-hidden="true"
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+            <SpeakButton
+              text={question.prompt.speakText as string}
+              variant="primary"
+              size="lg"
+              markEnterSecondary
+              ariaLabel="タイ語の音声を再生"
             />
-          </button>
+            <span className="text-sm font-medium text-gray-900 whitespace-nowrap">
+              タイ語を再生
+            </span>
+          </div>
           <p className="text-sm text-gray-600">
             タップで音声をもう一度再生できます
           </p>
         </div>
       ) : (
         <div className="mt-3">
-          <p className="text-2xl sm:text-3xl font-semibold text-gray-900 break-words leading-snug">
-            {question.prompt.text}
-          </p>
-          {question.prompt.romanization ? (
-            <p className="mt-1 text-sm sm:text-base text-gray-500 font-mono break-words">
-              {question.prompt.romanization}
+          {question.mode === "thai" ? (
+            <p className="mb-3 text-sm text-gray-600">
+              各選択肢の右のボタンで、タイ語の発音を聞けます。
             </p>
           ) : null}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-2xl sm:text-3xl font-semibold text-gray-900 break-words leading-snug">
+                {question.prompt.text}
+              </p>
+              {question.prompt.romanization ? (
+                <p className="mt-1 text-sm sm:text-base text-gray-500 font-mono break-words">
+                  {question.prompt.romanization}
+                </p>
+              ) : null}
+            </div>
+            {question.mode === "meaning" || question.mode === "fill" ? (
+              <SpeakButton
+                text={question.word.thai}
+                size="md"
+                markEnterSecondary
+                ariaLabel={`「${question.word.thai}」の発音を再生`}
+              />
+            ) : null}
+          </div>
         </div>
       )}
     </div>
@@ -305,26 +362,6 @@ function AnswerExplanation({
   isCorrect: boolean;
 }) {
   const word = question.word;
-  const [supported, setSupported] = useState(true);
-  const [speaking, setSpeaking] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setSupported(false);
-    }
-  }, []);
-
-  const speak = (text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "th-TH";
-    utter.rate = 0.85;
-    utter.onend = () => setSpeaking(false);
-    utter.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    window.speechSynthesis.speak(utter);
-  };
 
   return (
     <div
@@ -355,18 +392,12 @@ function AnswerExplanation({
               {word.meaning}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => speak(word.thai)}
-            disabled={!supported}
-            aria-label={`「${word.thai}」を再生`}
-            className="shrink-0 inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 transition-colors"
-          >
-            <Volume2
-              className={`h-5 w-5 ${speaking ? "animate-pulse" : ""}`}
-              aria-hidden="true"
-            />
-          </button>
+          <SpeakButton
+            text={word.thai}
+            markEnterSecondary
+            ariaLabel={`「${word.thai}」を再生`}
+            className="self-start"
+          />
         </div>
 
         <div className="mt-3 border-t border-gray-200 pt-3">
